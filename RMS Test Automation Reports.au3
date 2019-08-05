@@ -260,9 +260,9 @@ _Toast_Show(0, $app_name, "get all runtime saved from the runs", -30, False, Tru
 Local $todays_day_of_week = _DateToDayOfWeek(@YEAR, @MON, @MDAY)
 Local $number_of_days_to_last_monday = 2 - $todays_day_of_week - 7
 ;Local $previous_quarter_date = StringLeft(_DateAdd("D", $number_of_days_to_last_monday - (7 * 11), _NowCalc()), 10)
-Local $previous_six_months_date = StringLeft(_DateAdd("D", $number_of_days_to_last_monday - (7 * 25), _NowCalc()), 10)
+;Local $previous_six_months_date = StringLeft(_DateAdd("D", $number_of_days_to_last_monday - (7 * 25), _NowCalc()), 10)
 ;$created_after_date = _DateDiff( 's',"1970/01/01 00:00:00", $previous_quarter_date & " 00:00:00")
-$created_after_date = _DateDiff( 's',"1970/01/01 00:00:00", $previous_six_months_date & " 00:00:00")
+;$created_after_date = _DateDiff( 's',"1970/01/01 00:00:00", $previous_six_months_date & " 00:00:00")
 
 
 ; RUN TIME SAVED REPORT
@@ -270,7 +270,8 @@ $created_after_date = _DateDiff( 's',"1970/01/01 00:00:00", $previous_six_months
 
 Local $tomorrow_date = StringLeft(_DateAdd("D", 1, _NowCalc()), 10)
 $created_before_date = _DateDiff( 's',"1970/01/01 00:00:00", $tomorrow_date & " 00:00:00")
-Local $saved_runtime = _TestRailGetCreatedOnTestSavedRuntimeForRuns($testrail_project_id, $run_suite, $created_after_date, $created_before_date, $testcase_complexity_execution_weightage_dict)
+;Local $saved_runtime = _TestRailGetCreatedOnTestSavedRuntimeForRuns($testrail_project_id, $run_suite, $created_after_date, $created_before_date, $testcase_complexity_execution_weightage_dict)
+Local $saved_runtime = _TestRailGetCreatedOnTestSavedRuntimeForRuns($testrail_project_id, $run_suite, "", $created_before_date, $testcase_complexity_execution_weightage_dict)
 ;Local $saved_runtime = _TestRailGetCreatedOnTestSavedRuntimeForRuns($testrail_project_id, $run_suite, "", "", $testcase_complexity_execution_weightage_dict)
 
 for $i = 0 to (UBound($saved_runtime) - 1)
@@ -285,8 +286,11 @@ Next
 _Toast_Show(0, $app_name, "Creating Run Time Saved Report", -30, False, True)
 
 $storage_format = $storage_format & '<a href=\"' & $github_release_url & '\">Click to update this page</a><br /><br />'
-Local $query = "select strftime('%W', CreatedOn) as `Week Starting`, sum(SavedRuntime) as `Minutes Saved` from SavedRuntime group by `Week Starting`;"
-SQLite_with_weeks_to_Confluence_Chart("bar", "Run Time Saved (weekly) with Automation", "", "Week Starting", "Minutes Saved", "horizontal", "true", "false", "640", "480", "false", "", "after", "1,2", "1,2", "vertical", "", "", "day", "", "", "true", "", "", "", "", "", $query)
+
+;Local $query = "select strftime('%W', CreatedOn) as `Week Starting`, sum(SavedRuntime) as `Minutes Saved` from SavedRuntime group by `Week Starting`;"
+;SQLite_with_weeks_to_Confluence_Chart("bar", "Run Time Saved (weekly) with Automation", "", "Week Starting", "Minutes Saved", "horizontal", "true", "false", "800", "480", "false", "", "after", "1,2", "1,2", "vertical", "", "", "day", "", "", "true", "", "", "", "", "", $query)
+Local $query = "select `Week Starting`, (select sum(minutessaved) from (select strftime('%W', CreatedOn) as `Week Starting`, sum(SavedRuntime) as minutessaved from SavedRuntime group by `Week Starting`) c2 where c2.`Week Starting` <= c1.`Week Starting`) / 60 as `Hours Saved To Date` from (select strftime('%W', CreatedOn) as `Week Starting`, sum(SavedRuntime) as minutessaved from SavedRuntime group by `Week Starting`) c1;"
+SQLite_with_weeks_to_Confluence_Chart("bar", "Manual Run Time Saved (weekly to date) with Automation", "Note - data prior to 2019/07/08 is not reportable", "Week Starting", "Hours Saved To Date", "horizontal", "false", "false", "800", "480", "false", "", "after", "1,2", "1,2", "vertical", "", "", "day", "", "", "true", "", "", "", "", "", $query)
 
 
 ; MANUAL TEST CASES SAVED REPORT
@@ -314,14 +318,15 @@ _Toast_Show(0, $app_name, "Creating Manual Test Cases Saved Report", -30, False,
 
 _SQLite_GetTable2d(-1, "select sum(SavedCases) from SavedCases;", $aResult, $iRows, $iColumns)
 Local $query = "select Test as `Test Case`, SavedCases as `Test Cases Saved` from SavedCases;"
-SQLite_to_Confluence_Chart("pie", "Manual Test Cases Saved (to date) with Automation", "Total = " & $aResult[1][0], "", "Test Cases Saved", "false", "false", "640", "480", "false", "", "", "1,2", "1,2", "vertical", "", "", "day", "", "", "true", "", "", "", "", $query)
+SQLite_to_Confluence_Chart("pie", "Manual Test Cases Saved (to date) with Automation", "Total = " & $aResult[1][0], "", "Test Cases Saved", "false", "false", "800", "480", "false", "", "", "1,2", "1,2", "vertical", "", "", "day", "", "", "true", "", "", "", "", $query)
 
 
 ; AUTOMATION BUGS REPORT
 
 _Toast_Show(0, $app_name, "Get all bugs raised by automation", -30, False, True)
 
-$bug = _JiraGetSearchResultKeysCreatedDatePriorities("project = RMS AND issuetype = Bug AND labels = Automation AND created >= " & StringReplace($previous_six_months_date, "/", "-"))
+;$bug = _JiraGetSearchResultKeysCreatedDatePriorities("project = RMS AND issuetype = Bug AND labels = Automation AND created >= " & StringReplace($previous_six_months_date, "/", "-"))
+$bug = _JiraGetSearchResultKeysCreatedDatePriorities("project = RMS AND issuetype = Bug AND labels = Automation")
 
 for $i = 0 to (UBound($bug) - 1) Step 3
 
@@ -332,8 +337,10 @@ Next
 
 _Toast_Show(0, $app_name, "Creating Automation Bugs Report", -30, False, True)
 
-Local $query = "select aaa as Week, (select count(Key) as `Blocker` from Bug where strftime('%W', Created) = aaa and Priority = 'Blocker') as `Blocker`, (select count(Key) as `Critical` from Bug where strftime('%W', Created) = aaa and Priority = 'Critical') as `Critical`, (select count(Key) as `Major` from Bug where strftime('%W', Created) = aaa and Priority = 'Major') as `Major`, (select count(Key) as `Minor` from Bug where strftime('%W', Created) = aaa and Priority = 'Minor') as `Minor` from (select strftime('%W', Created) as aaa from Bug) group by aaa;"
-SQLite_with_weeks_to_Confluence_Chart("bar", "Bugs Found (weekly) with Automation", "", "Week Starting", "Bugs Found", "horizontal", "true", "true", "640", "480", "false", "", "", "1,2,3,4,5", "1,2,3,4,5", "vertical", "", "", "day", "", "", "true", "", "", "", "1", "", $query)
+;Local $query = "select aaa as Week, (select count(Key) as `Blocker` from Bug where strftime('%W', Created) = aaa and Priority = 'Blocker') as `Blocker`, (select count(Key) as `Critical` from Bug where strftime('%W', Created) = aaa and Priority = 'Critical') as `Critical`, (select count(Key) as `Major` from Bug where strftime('%W', Created) = aaa and Priority = 'Major') as `Major`, (select count(Key) as `Minor` from Bug where strftime('%W', Created) = aaa and Priority = 'Minor') as `Minor` from (select strftime('%W', Created) as aaa from Bug) group by aaa;"
+;SQLite_with_weeks_to_Confluence_Chart("bar", "Bugs Found (weekly) with Automation", "", "Week Starting", "Bugs Found", "horizontal", "true", "true", "800", "480", "false", "", "", "1,2,3,4,5", "1,2,3,4,5", "vertical", "", "", "day", "", "", "true", "", "", "", "1", "", $query)
+Local $query = "select week, (select sum(blocker) from (select week, (select count(Key) as blocker from Bug where strftime('%W', Created) = week and Priority = 'Blocker') as Blocker from (select strftime('%W', Created) as week from Bug) group by week) b2 where b2.week <= b1.week) as Blocker, (select sum(critical) from (select week, (select count(Key) as critical from Bug where strftime('%W', Created) = week and Priority = 'Critical') as Critical from (select strftime('%W', Created) as week from Bug) group by week) c2 where c2.week <= b1.week) as Critical, (select sum(major) from (select week, (select count(Key) as major from Bug where strftime('%W', Created) = week and Priority = 'Major') as Major from (select strftime('%W', Created) as week from Bug) group by week) ma where ma.week <= b1.week) as Major, (select sum(minor) from (select week, (select count(Key) as minor from Bug where strftime('%W', Created) = week and Priority = 'Minor') as Minor from (select strftime('%W', Created) as week from Bug) group by week) mi where mi.week <= b1.week) as Minor from (select week, (select count(Key) as blocker from Bug where strftime('%W', Created) = week and Priority = 'Blocker') as blocker, (select count(Key) as critical from Bug where strftime('%W', Created) = week and Priority = 'Critical') as critical from (select strftime('%W', Created) as week from Bug) group by week) b1;"
+SQLite_with_weeks_to_Confluence_Chart("bar", "Defects Raised (weekly to date) with Automation", "", "Week Starting", "Bugs Found To Date", "horizontal", "true", "true", "800", "480", "false", "", "after", "1,2,3,4,5", "1,2,3,4,5", "vertical", "", "", "day", "", "", "true", "", "", "", "5", "", $query)
 
 
 _JiraShutdown()
@@ -787,8 +794,8 @@ Func SQLite_to_Confluence_Chart_for_week($datetime)
 ;	Local $query = "select aaa as 'Test Name', ifnull((select sum(SavedRuntime) from SavedRuntime where Test = aaa and CreatedOn = '" & $day1_date & "'), 0) as '" & $day1_date & "', ifnull((select sum(SavedRuntime) from SavedRuntime where Test = aaa and CreatedOn = '" & $day2_date & "'), 0) as '" & $day2_date & "', ifnull((select sum(SavedRuntime) from SavedRuntime where Test = aaa and CreatedOn = '" & $day3_date & "'), 0) as '" & $day3_date & "', ifnull((select sum(SavedRuntime) from SavedRuntime where Test = aaa and CreatedOn = '" & $day4_date & "'), 0) as '" & $day4_date & "', ifnull((select sum(SavedRuntime) from SavedRuntime where Test = aaa and CreatedOn = '" & $day5_date & "'), 0) as '" & $day5_date & "', ifnull((select sum(SavedRuntime) from SavedRuntime where Test = aaa and CreatedOn = '" & $day6_date & "'), 0) as '" & $day6_date & "', ifnull((select sum(SavedRuntime) from SavedRuntime where Test = aaa and CreatedOn = '" & $day7_date & "'), 0) as '" & $day7_date & "' from (select distinct(Test) as aaa from SavedRuntime);"
 	Local $query = "select strftime('%W', CreatedOn) as 'Week', sum(SavedRuntime) as 'Saved Runtime' from SavedRuntime group by week;"
 	ConsoleWrite('@@ Debug(' & @ScriptLineNumber & ') : $query = ' & $query & @CRLF & '>Error code: ' & @error & @CRLF) ;### Debug Console
-;	SQLite_to_Confluence_Chart("bar", "Run Time Saved with Automation", "Week Starting " & Number($datetime_part[2]) & " " & $month_name & " " & Number($datetime_part[0]), "Run Date", "Minutes Saved", "true", "true", "640", "480", "false", "", "after", "1,2,3,4,5,6,7,8", "1,2,3,4,5,6,7,8", "horizontal", "", "", "day", "", "", "true", "", "", "", "", $query)
-	SQLite_to_Confluence_Chart("bar", "Run Time Saved with Automation", "", "Week Number", "Minutes Saved", "true", "false", "640", "480", "false", "", "after", "1,2", "1,2", "vertical", "", "", "day", "", "", "true", "", "", "", "", $query)
+;	SQLite_to_Confluence_Chart("bar", "Run Time Saved with Automation", "Week Starting " & Number($datetime_part[2]) & " " & $month_name & " " & Number($datetime_part[0]), "Run Date", "Minutes Saved", "true", "true", "800", "480", "false", "", "after", "1,2,3,4,5,6,7,8", "1,2,3,4,5,6,7,8", "horizontal", "", "", "day", "", "", "true", "", "", "", "", $query)
+	SQLite_to_Confluence_Chart("bar", "Run Time Saved with Automation", "", "Week Number", "Minutes Saved", "true", "false", "800", "480", "false", "", "after", "1,2", "1,2", "vertical", "", "", "day", "", "", "true", "", "", "", "", $query)
 
 EndFunc
 
